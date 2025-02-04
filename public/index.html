@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <link rel="shortcut icon" href="images/trophy-steam.png" type="image/x-icon">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Achievement Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header>
+        <div class="header-content">
+            <div class="header-title"><img src="images/trophy-steam.png" alt=""><h1>Steam Achievement Tracker</h1></div>
+            <p>Use your Steam ID to track your games that have achievements, filter out completed games and unstarted
+                games to show in-progress games, and take a look at the leaderboard to see how your stats compares to
+                others.</p>
+            <p>Note: Your Steam profile must be public for this to work. </p>
+        </div>
+    </header>
+
+
+    <main>
+        <div class="search-box">
+            <input type="text" id="steamId" placeholder="Enter Steam ID"
+                onkeypress="if(event.key === 'Enter') fetchGames()">
+            <button onclick="fetchGames()">Search</button>
+        </div>
+
+        <div id="error" class="error"></div>
+
+        <div id="userProfile" class="user-profile">
+            <div class="profile-header">
+                <img id="userAvatar" class="profile-avatar" src="" alt="User Avatar">
+                <div class="profile-info">
+                    <h2 id="userName">Your Profile</h2>
+                    <div class="profile-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Games:</span>
+                            <span id="totalGames">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Achievement Progress:</span>
+                            <span id="totalAchievements">0/0 (0%)</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Total Playtime:</span>
+                            <span id="totalPlaytime">0 hours</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="leaderboard-controls">
+            <button onclick="toggleLeaderboard()">Show Leaderboard</button>
+            <select id="leaderboardSort" onchange="changeSortMethod(this.value)">
+                <!-- <option value="percentage">Achievement %</option> -->
+                <option value="total">Total Achievements</option>
+                <option value="games">Total Games</option>
+                <option value="playtime">Playtime</option>
+                <!-- <option value="name">Name</option> -->
+            </select>
+        </div>
+
+        <div class="leaderboard-container">
+            <h2>Achievement Hunters Leaderboard</h2>
+            <div id="leaderboard" class="leaderboard" style="display: none;">
+                <div class="leaderboard-titles">
+                    <div class="titles-names">
+                        <span class="leaderboard-rank-stat" title="Global Rank">Rank</span>
+                        <span title="User name">Name</span>
+                    </div>
+                    <div class="titles-stats">
+                        <span title="Total Achievements">Achievements</span>
+                        <span title="Total Games">Games</span>
+                        <span title="Total Playtime">Hours Played</span>
+                    </div>
+
+                </div>
+                <div class="leaderboard-grid"></div>
+            </div>
+        </div>
+
+
+        <!-- Add view controls -->
+        <div class="view-controls">
+            <div class="toggle-group">
+                <button id="viewToggle" onclick="toggleView()">
+                    <span id="viewToggleText">Condensed View</span>
+                </button>
+                <button id="hideComplete" onclick="toggleCompleteGames()">
+                    Hide 100% Games
+                </button>
+                <button id="hideZero" onclick="toggleZeroGames()">
+                    Hide 0% Games
+                </button>
+            </div>
+            <div class="sort-group">
+                <button onclick="sortGames('percentage')">Sort by Progress</button>
+                <button onclick="sortGames('playtime')">Sort by Playtime</button>
+                <button onclick="sortGames('name')">Sort by Name</button>
+            </div>
+        </div>
+
+        <div id="loadingContainer" class="loading-container" style="display: none;">
+            <div class="loading-content">
+                <div class="loading-text">Loading games...</div>
+                <div class="progress-bar">
+                    <div id="progressBar" class="progress"></div>
+                </div>
+                <div id="loadingStats" class="loading-stats">0/0 games</div>
+                <div id="estimatedTime" class="estimated-time">00:00 time remaining</div>
+                <button id="cancelButton" class="cancel-button">Stop Loading</button>
+            </div>
+        </div>
+
+        <div class="games-section">
+            <div class="section-header">
+                <h2 id="achievements">Games with Achievement Progress</h2>
+                <div id="progressStats" class="stats"></div>
+            </div>
+            <div id="gamesInProgress" class="games-grid"></div>
+        </div>
+
+        <div class="games-section">
+            <div class="section-header">
+                <h2 id="no-achievements">Games with No Achievement Progress</h2>
+                <div id="noProgressStats" class="stats"></div>
+            </div>
+            <div id="gamesNoProgress" class="games-grid"></div>
+        </div>
+    </main>
+
+    <script>
+        let isCondensedView = false;
+        let hideCompleteGames = false;
+        let hideZeroGames = false;
+        let currentPage = 1;
+        let currentSort = 'total';
+        let currentSortMethod = 'percentage';
+        let currentGamesData = {
+            inProgress: [],
+            noProgress: []
+        };
+
+        async function fetchUserProfile(steamId) {
+            try {
+                const response = await fetch(`/api/steam/ISteamUser/GetPlayerSummaries/v2/?steamids=${steamId}`);
+                const data = await response.json();
+
+                if (data && data.response && data.response.players && data.response.players[0]) {
+                    const player = data.response.players[0];
+
+                    document.getElementById('userProfile').style.display = 'block';
+                    document.getElementById('userAvatar').src = player.avatarfull;
+                    document.getElementById('userName').textContent = player.personaname;
+
+                    return player;
+                } else {
+                    throw new Error('Could not fetch user profile');
+                }
+            } catch (error) {
+                console.error('Error fetching user profile:', error);
+                // Set default values if profile fetch fails
+                document.getElementById('userProfile').style.display = 'block';
+                document.getElementById('userAvatar').src = 'https://steamcdn-a.akamaihd.net/steamcommunity/public/images/avatars/fe/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg';
+                document.getElementById('userName').textContent = 'Steam User';
+            }
+        }
+
+        async function updateProfileStats(games, gamesWithAchievements) {
+            const totalGames = games.length;
+            let totalAchievements = 0;
+            let totalPossibleAchievements = 0;
+            let totalPlaytime = 0;
+
+            gamesWithAchievements.forEach(game => {
+                totalAchievements += game.achievements.completed;
+                totalPossibleAchievements += game.achievements.total;
+                totalPlaytime += game.playtime_forever;
+            });
+
+            const achievementPercentage = Math.round((totalAchievements / totalPossibleAchievements) * 100);
+            const playtimeHours = Math.round(totalPlaytime / 60);
+
+
+            document.getElementById('totalGames').textContent = totalGames;
+            document.getElementById('totalAchievements').textContent =
+                `${totalAchievements}/${totalPossibleAchievements} (${achievementPercentage}%)`;
+            document.getElementById('totalPlaytime').textContent = `${playtimeHours} hours`;
+
+            // Prepare user data
+            try {
+                const userData = {
+                    steamId: document.getElementById('steamId').value.trim(),
+                    personaname: document.getElementById('userName').textContent,
+                    avatarUrl: document.getElementById('userAvatar').src,
+                    stats: {
+                        totalGames,
+                        gamesWithAchievements: gamesWithAchievements.length,
+                        totalAchievements,
+                        totalPossibleAchievements,
+                        achievementPercentage,
+                        totalPlaytime: playtimeHours
+                    }
+                };
+
+                console.log('Sending user data:', userData); // Debug log
+
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+                console.log('Save result:', result); // Debug log
+
+                if (!result.success) {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                console.error('Error saving user data:', error);
+            }
+        }
+
+        function sortGames(method) {
+            currentSortMethod = method;
+            const buttons = document.querySelectorAll('.sort-group button');
+            buttons.forEach(button => button.classList.remove('active'));
+            event.target.classList.add('active');
+
+            refreshGameDisplay();
+        }
+
+        function toggleCompleteGames() {
+            hideCompleteGames = !hideCompleteGames;
+            document.getElementById('hideComplete').classList.toggle('active');
+            refreshGameDisplay();
+        }
+
+        function toggleZeroGames() {
+            hideZeroGames = !hideZeroGames;
+            document.getElementById('hideZero').classList.toggle('active');
+            refreshGameDisplay();
+        }
+
+        function refreshGameDisplay() {
+            const gamesInProgress = document.getElementById('gamesInProgress');
+            const gamesNoProgress = document.getElementById('gamesNoProgress');
+
+            let filteredInProgress = [...currentGamesData.inProgress];
+            let filteredNoProgress = [...currentGamesData.noProgress];
+
+            // Apply filters
+            if (hideCompleteGames) {
+                filteredInProgress = filteredInProgress.filter(game => game.achievements.percentage < 100);
+            }
+            if (hideZeroGames) {
+                filteredNoProgress = filteredNoProgress.filter(game => game.achievements.percentage > 0);
+            }
+
+            // Apply sorting
+            const sortFunction = getSortFunction(currentSortMethod);
+            filteredInProgress.sort(sortFunction);
+            filteredNoProgress.sort(sortFunction);
+
+            // Update displays
+            gamesInProgress.innerHTML = '';
+            gamesNoProgress.innerHTML = '';
+
+            filteredInProgress.forEach(game => {
+                gamesInProgress.appendChild(createGameCard(game));
+            });
+            filteredNoProgress.forEach(game => {
+                gamesNoProgress.appendChild(createGameCard(game));
+            });
+
+            // Update stats
+            updateSectionStats(filteredInProgress, filteredNoProgress);
+        }
+
+        function getSortFunction(method) {
+            switch (method) {
+                case 'percentage':
+                    return (a, b) => b.achievements.percentage - a.achievements.percentage ||
+                        a.name.localeCompare(b.name);
+                case 'playtime':
+                    return (a, b) => b.playtime_forever - a.playtime_forever ||
+                        a.name.localeCompare(b.name);
+                case 'name':
+                    return (a, b) => a.name.localeCompare(b.name);
+                default:
+                    return (a, b) => 0;
+            }
+        }
+
+
+        function toggleView() {
+            isCondensedView = !isCondensedView;
+            const toggleText = document.getElementById('viewToggleText');
+            toggleText.textContent = isCondensedView ? 'Switch to Detailed View' : 'Switch to Condensed View';
+
+            // Refresh the display
+            const gamesInProgress = document.getElementById('gamesInProgress');
+            const gamesNoProgress = document.getElementById('gamesNoProgress');
+
+            // Store the current games data
+            const inProgressGames = Array.from(gamesInProgress.children).map(card => card.__gameData);
+            const noProgressGames = Array.from(gamesNoProgress.children).map(card => card.__gameData);
+
+            // Clear and rebuild the displays
+            gamesInProgress.innerHTML = '';
+            gamesNoProgress.innerHTML = '';
+
+            inProgressGames.forEach(game => {
+                gamesInProgress.appendChild(createGameCard(game));
+            });
+            noProgressGames.forEach(game => {
+                gamesNoProgress.appendChild(createGameCard(game));
+            });
+        }
+
+        async function resolveVanityUrl(vanityUrl) {
+            try {
+                const response = await fetch(`/api/steam/resolve-vanity/${vanityUrl}`);
+                const data = await response.json();
+                return data.steamId;
+            } catch (error) {
+                console.error('Error resolving vanity URL:', error);
+                return null;
+            }
+        }
+
+        class TimeEstimator {
+            constructor(totalItems) {
+                this.startTime = Date.now();
+                this.totalItems = totalItems;
+                this.processedItems = 0;
+                this.lastUpdateTime = this.startTime;
+                this.recentSpeeds = [];
+                this.updateInterval = 1000; // Update every second
+            }
+
+            update(currentCount) {
+                const currentTime = Date.now();
+                const elapsedTime = currentTime - this.startTime;
+
+                // Only update every second
+                if (currentTime - this.lastUpdateTime < this.updateInterval) {
+                    return null;
+                }
+
+                this.lastUpdateTime = currentTime;
+                const itemsProcessed = currentCount - this.processedItems;
+                this.processedItems = currentCount;
+
+                // Calculate speed (items per millisecond)
+                if (itemsProcessed > 0) {
+                    const speed = itemsProcessed / this.updateInterval;
+                    this.recentSpeeds.push(speed);
+
+                    // Keep only last 5 speed measurements
+                    if (this.recentSpeeds.length > 5) {
+                        this.recentSpeeds.shift();
+                    }
+                }
+
+                // Calculate average speed
+                const avgSpeed = this.recentSpeeds.reduce((a, b) => a + b, 0) / this.recentSpeeds.length;
+
+                // Calculate remaining time
+                const remainingItems = this.totalItems - currentCount;
+                const estimatedRemainingMs = avgSpeed ? (remainingItems / avgSpeed) : 0;
+
+                return this.formatTime(estimatedRemainingMs);
+            }
+
+            formatTime(ms) {
+                if (!ms || isNaN(ms)) return '00:00';
+
+                const seconds = Math.ceil(ms / 1000);
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+
+                return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+            }
+        }
+
+        let currentAbortController = null;
+
+        async function fetchGames() {
+
+            if (currentAbortController) {
+                currentAbortController.abort();
+            }
+            currentAbortController = new AbortController();
+            const signal = currentAbortController.signal;
+
+            let steamId = document.getElementById('steamId').value.trim();
+            const errorDiv = document.getElementById('error');
+            const loadingContainer = document.getElementById('loadingContainer');
+            const progressBar = document.getElementById('progressBar');
+            const loadingStats = document.getElementById('loadingStats');
+            const gamesInProgress = document.getElementById('gamesInProgress');
+            const gamesNoProgress = document.getElementById('gamesNoProgress');
+            const progressStats = document.getElementById('progressStats');
+            const noProgressStats = document.getElementById('noProgressStats');
+
+
+            // Reset displays
+            errorDiv.style.display = 'none';
+            loadingContainer.style.display = 'flex';
+            progressBar.style.width = '0%';
+            gamesInProgress.innerHTML = '';
+            gamesNoProgress.innerHTML = '';
+
+            cancelButton.disabled = false;
+            const handleCancel = () => {
+                if (currentAbortController) {
+                    currentAbortController.abort();
+                }
+            };
+            cancelButton.addEventListener('click', handleCancel);
+
+            try {
+                // Check if input is a vanity URL
+                if (isNaN(steamId)) {
+                    const urlMatch = steamId.match(/\/id\/([^\/]+)/);
+                    if (urlMatch) {
+                        steamId = urlMatch[1];
+                    }
+                    const resolvedId = await resolveVanityUrl(steamId);
+                    if (!resolvedId) {
+                        throw new Error('Could not resolve Steam ID from vanity URL');
+                    }
+                    steamId = resolvedId;
+                }
+
+                // Fetch user profile first
+                await fetchUserProfile(steamId);
+
+                // Fetch all games
+                const response = await fetch(`/api/steam/IPlayerService/GetOwnedGames/v0001/?steamid=${steamId}&format=json&include_appinfo=1`);
+                const data = await response.json();
+
+                if (!data.response || !data.response.games) {
+                    throw new Error('No games found or profile is private');
+                }
+
+                const games = data.response.games;
+                loadingStats.textContent = `0/${games.length} games`;
+
+                const timeEstimator = new TimeEstimator(games.length);
+                const batchSize = 50;
+                const maxConcurrentBatches = 4;
+                const gamesWithAchievements = [];
+                let loadedGames = 0;
+                let skippedGames = 0;
+
+                for (let i = 0; i < games.length; i += (batchSize * maxConcurrentBatches)) {
+                    if (signal.aborted) {
+                        throw new Error('Loading cancelled');
+                    }
+                    const batchPromises = [];
+
+                    for (let j = 0; j < maxConcurrentBatches; j++) {
+                        const startIdx = i + (j * batchSize);
+                        const batch = games.slice(startIdx, startIdx + batchSize);
+
+                        if (batch.length > 0) {
+                            const batchPromise = Promise.all(
+                                batch.map(async game => {
+                                    if (signal.aborted) {
+                                        throw new Error('Loading cancelled');
+                                    }
+                                    try {
+                                        const response = await fetch(`/api/steam/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${game.appid}&steamid=${steamId}`,
+                                            { signal }
+                                        );
+                                        if (!response.ok) {
+                                            skippedGames++;
+                                            return null;
+                                        }
+                                        return response.json();
+                                    } catch (error) {
+                                        if (error.name === 'AbortError') {
+                                            throw error;
+                                        }
+                                        console.error('Error fetching achievements:', error);
+                                        skippedGames++;
+                                        return null;
+                                    }
+                                })
+                            ).then(results => {
+                                batch.forEach((game, index) => {
+                                    const achievementData = results[index];
+                                    if (achievementData?.playerstats?.achievements) {
+                                        const achievements = achievementData.playerstats.achievements;
+                                        const total = achievements.length;
+                                        const completed = achievements.filter(a => a.achieved === 1).length;
+                                        const percentage = Math.round((completed / total) * 100); // Rounded percentage
+
+                                        gamesWithAchievements.push({
+                                            ...game,
+                                            achievements: {
+                                                total,
+                                                completed,
+                                                percentage
+                                            }
+                                        });
+                                    }
+
+                                    loadedGames++;
+                                    const progress = (loadedGames / games.length) * 100;
+                                    progressBar.style.width = `${progress}%`;
+                                    loadingStats.textContent = `${loadedGames}/${games.length} games (${skippedGames} skipped)`;
+                                    const timeRemaining = timeEstimator.update(loadedGames);
+                                    if (timeRemaining) {
+                                        estimatedTime.textContent = `${timeRemaining} remaining`;
+                                    }
+                                });
+                            });
+
+                            batchPromises.push(batchPromise);
+                        }
+                    }
+
+                    await Promise.all(batchPromises);
+                }
+
+                // Update profile stats and display games
+                updateProfileStats(games, gamesWithAchievements);
+                currentGamesData.inProgress = gamesWithAchievements.filter(game => game.achievements.completed > 0);
+                currentGamesData.noProgress = gamesWithAchievements.filter(game => game.achievements.completed === 0);
+                refreshGameDisplay();
+
+            } catch (error) {
+                if (error.name === 'AbortError' || error.message === 'Loading cancelled') {
+                    errorDiv.textContent = 'Loading cancelled';
+                } else {
+                    errorDiv.textContent = error.message;
+                }
+                errorDiv.style.display = 'block';
+            } finally {
+                // Cleanup
+                cancelButton.removeEventListener('click', handleCancel);
+                cancelButton.disabled = true;
+                loadingContainer.style.display = 'none';
+                currentAbortController = null;
+                document.getElementById('estimatedTime').textContent = '00:00 remaining';
+                console.clear();
+            }
+        }
+
+        function createGameCard(game) {
+            const cardLink = document.createElement('a');
+            cardLink.href = `https://store.steampowered.com/app/${game.appid}`;
+            cardLink.target = "_blank";
+            cardLink.rel = "noopener noreferrer";
+            cardLink.className = `game-card ${isCondensedView ? 'condensed' : ''}`;
+
+            // Store the game data for rebuilding the card
+            cardLink.__gameData = game;
+
+            const { total, completed, percentage } = game.achievements;
+            const playtimeHours = Math.round(game.playtime_forever / 60);
+
+            // Default game icon if none exists
+            const defaultIcon = '/images/steam_logo.svg';
+            const gameIcon = game.img_icon_url
+                ? `https://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`
+                : defaultIcon;
+
+
+            if (isCondensedView) {
+                cardLink.innerHTML = `
+            <h3>${game.name}</h3>
+            <span class="achievement-percentage">${percentage}%</span>
+        `;
+            } else {
+                cardLink.innerHTML = `
+            <div class="game-header">
+                <img class="game-icon" 
+                     src="${gameIcon}"
+                     onerror="this.src='${defaultIcon}'"
+                     alt="${game.name}">
+                <h3>${game.name}</h3>
+            </div>
+            <div class="achievement-bar">
+                <div class="achievement-progress" style="width: ${percentage}%"></div>
+            </div>
+            <p>${completed}/${total} achievements (${percentage}%)</p>
+            <p>Playtime: ${playtimeHours} hours</p>
+        `;
+            }
+
+            return cardLink;
+        }
+
+        function getSteamProfileUrl(steamId) {
+            // Check if the steamId is a 17-digit number (standard Steam64 ID)
+            const isSteam64Id = /^\d{17}$/.test(steamId);
+
+            // Check if it's any numeric value
+            const isNumeric = !isNaN(steamId);
+
+            if (isSteam64Id || isNumeric) {
+                return `https://steamcommunity.com/profiles/${steamId}`;
+            } else {
+                return `https://steamcommunity.com/id/${steamId}`;
+            }
+        }
+
+
+        function updateSectionStats(filteredInProgress, filteredNoProgress) {
+            const progressStats = document.getElementById('progressStats');
+            const noProgressStats = document.getElementById('noProgressStats');
+
+            const totalGames = currentGamesData.inProgress.length + currentGamesData.noProgress.length;
+            const hiddenComplete = currentGamesData.inProgress.length - filteredInProgress.length;
+            const hiddenZero = currentGamesData.noProgress.length - filteredNoProgress.length;
+
+            progressStats.textContent = `Games with progress: ${filteredInProgress.length}` +
+                (hiddenComplete ? ` (${hiddenComplete} hidden)` : '');
+            noProgressStats.textContent = `Games with no progress: ${filteredNoProgress.length}` +
+                (hiddenZero ? ` (${hiddenZero} hidden)` : '');
+        }
+
+        let isLeaderboardVisible = false;
+
+        async function toggleLeaderboard() {
+            const leaderboard = document.getElementById('leaderboard');
+            isLeaderboardVisible = !isLeaderboardVisible;
+            leaderboard.style.display = isLeaderboardVisible ? 'block' : 'none';
+
+            if (isLeaderboardVisible) {
+                await updateLeaderboard();
+            }
+        }
+
+        function changeSortMethod(newSort) {
+            currentSort = newSort;
+            currentPage = 1; // Reset to first page when sorting changes
+            updateLeaderboard();
+        }
+
+
+        async function updateLeaderboard(page = currentPage) {
+            const leaderboardDiv = document.querySelector('.leaderboard-grid');
+            currentPage = page; // Update current page
+            const limit = 5;
+
+            try {
+                leaderboardDiv.innerHTML = '<div class="loading">Loading leaderboard...</div>';
+
+                const response = await fetch(`/api/leaderboard?page=${page}&limit=${limit}&sortBy=${currentSort}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to fetch leaderboard');
+                }
+
+                const users = data.users;
+                const pagination = data.pagination;
+
+                if (!Array.isArray(users)) {
+                    throw new Error('Invalid leaderboard data received');
+                }
+
+                if (users.length === 0) {
+                    leaderboardDiv.innerHTML = '<div class="no-data">No users found</div>';
+                    return;
+                }
+
+                // Render leaderboard with pagination
+                let html = '';
+
+                // Render users
+                users.forEach((user, index) => {
+                    const actualRank = (pagination.current - 1) * limit + index + 1;
+                    html += `
+                <div class="leaderboard-entry">
+                    <span class="leaderboard-rank">#${actualRank}</span>
+                    <div class="leaderboard-user">
+                        <img class="leaderboard-avatar" 
+                             src="${user.avatarUrl || 'default-avatar.png'}" 
+                             alt="${user.personaname || 'Unknown User'}"
+                             onerror="this.src='default-avatar.png'">
+                        <a href="${getSteamProfileUrl(user.steamId)}" 
+                           target="_blank" 
+                           class="username-link"
+                           rel="noopener noreferrer">
+                            ${user.personaname || 'Unknown User'}
+                        </a>
+                    </div>
+                    <div class="leaderboard-stats">
+                        <span title="Total Achievements">${user.stats?.totalAchievements || 0}</span>
+                        <span title="Total Games">${user.stats?.totalGames || 0}</span>
+                        <span title="Total Playtime">${user.stats?.totalPlaytime || 0}</span>
+                    </div>
+                </div>
+            `;
+                });
+
+                // Add pagination controls
+                html += `
+            <div class="pagination-controls">
+                <button 
+                    ${pagination.current === 1 ? 'disabled' : ''}
+                    onclick="updateLeaderboard(${pagination.current - 1})"
+                    class="pagination-button"
+                >
+                    Previous
+                </button>
+                <span class="pagination-info">
+                    Page ${pagination.current} of ${pagination.pages}
+                </span>
+                <button 
+                    ${pagination.current === pagination.pages ? 'disabled' : ''}
+                    onclick="updateLeaderboard(${pagination.current + 1})"
+                    class="pagination-button"
+                >
+                    Next
+                </button>
+            </div>
+        `;
+
+                leaderboardDiv.innerHTML = html;
+
+            } catch (error) {
+                console.error('Error fetching leaderboard:', error);
+                leaderboardDiv.innerHTML = `
+            <div class="error-message">
+                Failed to load leaderboard: ${error.message}
+            </div>
+        `;
+            }
+        }
+
+    </script>
+</body>
+
+</html>
