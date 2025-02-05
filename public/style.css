@@ -507,7 +507,7 @@ a {
 }
 
 .titles-names {
-  gap: 62px;
+  gap: 50px;
   display: flex;
 }
 
@@ -565,9 +565,9 @@ a {
   }
 }
 
-@media screen and (max-width: 800px) {
+@media screen and (max-width: 830px) {
   .leaderboard-titles {
-    gap: 40px;
+    gap: 80px;
   }
   #leaderboard {
     overflow: auto;
@@ -589,8 +589,16 @@ a {
     }
   }
 
+  .leaderboard-rank {
+    margin-right: 10px;
+  }
+
   .leaderboard-avatar {
     display: none;
+  }
+
+  .leaderboard-titles {
+    gap: 60px;
   }
 
   .titles-names {
@@ -606,10 +614,6 @@ a {
   .profile-header {
     text-align: center;
     font-size: 0.9rem;
-  }
-
-  .leaderboard-rank {
-    margin-right: 10px;
   }
 
   .profile-avatar {
@@ -635,9 +639,17 @@ a {
     display: none;
   }
 
+  .leaderboard-titles {
+    gap: 12.5px;
+  }
+
   .leaderboard-user {
-    min-width: 80px;
+    width: 100px;
     margin-left: 0;
+  }
+
+  .titles-names {
+    width: 100px;
   }
 
   .leaderboard-entry {
