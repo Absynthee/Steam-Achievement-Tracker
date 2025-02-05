@@ -45,6 +45,7 @@ header {
 .header-title {
   display: flex;
   align-items: center;
+  line-height: 1.1;
 
   img {
     width: 40px;
@@ -560,6 +561,20 @@ a {
 }
 
 @media screen and (max-width: 600px) {
+  .header-content {
+    text-align: center;
+  }
+
+  .header-title {
+    flex-direction: column;
+
+    img {
+      margin-right: 0;
+      padding-top: 10px;
+      width: 80px;
+    }
+  }
+
   .leaderboard-avatar {
     display: none;
   }
