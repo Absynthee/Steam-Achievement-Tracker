@@ -8,8 +8,6 @@ const mongoose = require("mongoose");
 require("dotenv").config();
 
 const app = express();
-const cache = new NodeCache({ stdTTL: 6000 }); // 10 minutes cache
-
 const { cleanSteamId } = require("./utils/steamUtils");
 
 // Enable CORS
@@ -33,6 +31,13 @@ mongoose.connection.on("connected", () => {
   console.log("MongoDB connected");
 });
 
+function clearLeaderboardCache() {
+  const keys = cache.keys();
+  const leaderboardKeys = keys.filter((key) => key.startsWith("leaderboard_"));
+  cache.del(leaderboardKeys);
+  console.log("Cleared leaderboard cache");
+}
+
 // Test endpoint for MongoDB connection
 app.get("/api/db-status", (req, res) => {
   res.json({
@@ -55,12 +60,8 @@ app.post("/api/users", async (req, res) => {
 
     const User = require("./models/User");
 
-    // Standardize steamId to lowercase
-    // const standardizedSteamId = req.body.steamId.toLowerCase();
-
     const userData = {
-      // steamId: standardizedSteamId, // Use standardized steamId
-      steamId: req.body.steamId, // Will be cleaned by the schema
+      steamId: req.body.steamId,
       personaname: req.body.personaname,
       avatarUrl: req.body.avatarUrl,
       stats: req.body.stats,
@@ -70,7 +71,7 @@ app.post("/api/users", async (req, res) => {
     console.log("Processing user data:", userData);
 
     const user = await User.findOneAndUpdate(
-      { steamId: userData.steamId }, // Use standardized steamId for query
+      { steamId: userData.steamId },
       userData,
       {
         upsert: true,
@@ -78,6 +79,7 @@ app.post("/api/users", async (req, res) => {
         setDefaultsOnInsert: true,
       }
     );
+    clearLeaderboardCache();
 
     console.log("Saved user:", user);
     res.json({ success: true, user });
@@ -91,13 +93,25 @@ app.post("/api/users", async (req, res) => {
 });
 
 // Add new endpoints for leaderboard
+const cache = new NodeCache({ stdTTL: 60 }); // Cache for 60 seconds
+
 app.get("/api/leaderboard", async (req, res) => {
   try {
     console.log("Fetching leaderboard...");
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 5;
-    const sortBy = req.query.sortBy || "total"; // Get sort parameter
+    const sortBy = req.query.sortBy || "total";
     const skip = (page - 1) * limit;
+
+    // Create cache key including all parameters
+    const cacheKey = `leaderboard_${page}_${limit}_${sortBy}`;
+
+    // Check cache first
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      console.log("Returning cached leaderboard data");
+      return res.json(cachedData);
+    }
 
     const User = require("./models/User");
 
@@ -112,6 +126,9 @@ app.get("/api/leaderboard", async (req, res) => {
         break;
       case "games":
         sortOption = { "stats.totalGames": -1 };
+        break;
+      case "completed":
+        sortOption = { "stats.completedGames": -1 };
         break;
       case "playtime":
         sortOption = { "stats.totalPlaytime": -1 };
@@ -133,7 +150,7 @@ app.get("/api/leaderboard", async (req, res) => {
 
     console.log(`Found ${users.length} users on page ${page}`);
 
-    res.json({
+    const response = {
       success: true,
       users,
       pagination: {
@@ -143,7 +160,13 @@ app.get("/api/leaderboard", async (req, res) => {
         hasNext: page < Math.ceil(total / limit),
         hasPrev: page > 1,
       },
-    });
+    };
+
+    // Store in cache
+    cache.set(cacheKey, response);
+    console.log(`Cached leaderboard data for key: ${cacheKey}`);
+
+    res.json(response);
   } catch (error) {
     console.error("Leaderboard error:", error);
     res.status(500).json({
@@ -239,6 +262,38 @@ const checkRateLimit = (req, res, next) => {
   }
   next();
 };
+
+app.get("/api/update-completed-games", async (req, res) => {
+  try {
+    const User = require("./models/User");
+    const users = await User.find();
+    let updatedCount = 0;
+
+    for (const user of users) {
+      if (user.stats && Array.isArray(user.stats.games)) {
+        const completedGames = user.stats.games.filter(
+          (game) => game.achievements?.percentage === 100
+        ).length;
+
+        await User.findByIdAndUpdate(user._id, {
+          $set: { "stats.completedGames": completedGames },
+        });
+
+        updatedCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Updated ${updatedCount} users with completed games count`,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
 
 // Steam API endpoints
 app.get(

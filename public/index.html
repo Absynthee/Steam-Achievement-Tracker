@@ -41,15 +41,20 @@
                     <div class="profile-stats">
                         <div class="stat-item">
                             <span class="stat-label">Total Games:</span>
-                            <span id="totalGames">0</span>
+                            <span id="totalGames">---</span>
                         </div>
                         <div class="stat-item">
+                            <span class="stat-label">Completed Games:</span>
+                            <span id="completedGames">---</span>
+                        </div>
+
+                        <div class="stat-item">
                             <span class="stat-label">Achievement Progress:</span>
-                            <span id="totalAchievements">0/0 (0%)</span>
+                            <span id="totalAchievements">---</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">Total Playtime:</span>
-                            <span id="totalPlaytime">0 hours</span>
+                            <span id="totalPlaytime">---</span>
                         </div>
                     </div>
                 </div>
@@ -75,10 +80,14 @@
                         <option value="name" onclick="changeSortMethod(this.value)" title="User name">Name</option>
                     </div>
                     <div class="titles-stats">
+                        <option value="games" onclick="changeSortMethod(this.value)" title="Total Games">Games</option>
+                        <option value="completed" onclick="changeSortMethod(this.value)" title="Completed Games">
+                            Completed</option>
+
                         <option value="total" onclick="changeSortMethod(this.value)" title="Total Achievements">
                             Achievements</option>
-                        <option value="games" onclick="changeSortMethod(this.value)" title="Total Games">Games</option>
-                        <option value="playtime" onclick="changeSortMethod(this.value)" title="Total Playtime">Hours</option>
+                        <option value="playtime" onclick="changeSortMethod(this.value)" title="Total Playtime">Hours
+                        </option>
                     </div>
 
                 </div>
@@ -182,11 +191,16 @@
             let totalAchievements = 0;
             let totalPossibleAchievements = 0;
             let totalPlaytime = 0;
+            let completedGames = 0;
 
             gamesWithAchievements.forEach(game => {
                 totalAchievements += game.achievements.completed;
                 totalPossibleAchievements += game.achievements.total;
                 totalPlaytime += game.playtime_forever;
+
+                if (game.achievements.percentage === 100) {
+                    completedGames++;
+                }
             });
 
             const achievementPercentage = Math.round((totalAchievements / totalPossibleAchievements) * 100);
@@ -197,6 +211,7 @@
             document.getElementById('totalAchievements').textContent =
                 `${totalAchievements}/${totalPossibleAchievements} (${achievementPercentage}%)`;
             document.getElementById('totalPlaytime').textContent = `${playtimeHours} hours`;
+            document.getElementById('completedGames').textContent = `${completedGames}`;
 
             // Prepare user data
             try {
@@ -210,7 +225,8 @@
                         totalAchievements,
                         totalPossibleAchievements,
                         achievementPercentage,
-                        totalPlaytime: playtimeHours
+                        totalPlaytime: playtimeHours,
+                        completedGames
                     }
                 };
 
@@ -473,7 +489,7 @@
                 await fetchUserProfile(steamId);
 
                 // Fetch all games
-                const response = await fetch(`/api/steam/IPlayerService/GetOwnedGames/v0001/?steamid=${steamId}&format=json&include_appinfo=1`);
+                const response = await fetch(`/api/steam/IPlayerService/GetOwnedGames/v0001/?steamid=${steamId}&format=json&include_appinfo=1&skip_unvetted_apps=0`);
                 const data = await response.json();
 
                 if (!data.response || !data.response.games) {
@@ -559,9 +575,8 @@
                     }
 
                     await Promise.all(batchPromises);
-                    await updateLeaderboard()
                 }
-
+                
                 // Update profile stats and display games
                 updateProfileStats(games, gamesWithAchievements);
                 currentGamesData.inProgress = gamesWithAchievements.filter(game => game.achievements.completed > 0);
@@ -583,6 +598,7 @@
                 currentAbortController = null;
                 document.getElementById('estimatedTime').textContent = '00:00 remaining';
                 console.clear();
+                await updateLeaderboard();
             }
         }
 
@@ -718,8 +734,8 @@
                     const actualRank = (pagination.current - 1) * limit + index + 1;
                     html += `
                 <div class="leaderboard-entry">
-                    <span class="leaderboard-rank">#${actualRank}</span>
                     <div class="leaderboard-user">
+                        <span class="leaderboard-rank">#${actualRank}</span>
                         <img class="leaderboard-avatar" 
                              src="${user.avatarUrl || 'default-avatar.png'}" 
                              alt="${user.personaname || 'Unknown User'}"
@@ -732,8 +748,9 @@
                         </a>
                     </div>
                     <div class="leaderboard-stats">
-                        <span title="Total Achievements">${user.stats?.totalAchievements || 0}</span>
                         <span title="Total Games">${user.stats?.totalGames || 0}</span>
+                        <span title="Completed Games">${user.stats?.completedGames || 0}</span>
+                        <span title="Total Achievements">${user.stats?.totalAchievements || 0}</span>
                         <span title="Total Playtime">${user.stats?.totalPlaytime || 0}</span>
                     </div>
                 </div>

@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema({
   },
   stats: {
     totalGames: Number,
+    completedGames: Number,
     gamesWithAchievements: Number,
     totalAchievements: Number,
     totalPossibleAchievements: Number,
