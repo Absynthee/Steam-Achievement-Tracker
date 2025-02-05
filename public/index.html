@@ -13,7 +13,9 @@
 
     <header>
         <div class="header-content">
-            <div class="header-title"><img src="images/trophy-steam.png" alt=""><h1>Steam Achievement Tracker</h1></div>
+            <div class="header-title"><img src="images/trophy-steam.png" alt="">
+                <h1>Steam Achievement Tracker</h1>
+            </div>
             <p>Use your Steam ID to track your games that have achievements, filter out completed games and unstarted
                 games to show in-progress games, and take a look at the leaderboard to see how your stats compares to
                 others.</p>
@@ -33,7 +35,7 @@
 
         <div id="userProfile" class="user-profile">
             <div class="profile-header">
-                <img id="userAvatar" class="profile-avatar" src="" alt="User Avatar">
+                <img id="userAvatar" class="profile-avatar" src="images/trophy-steam-padded.png" alt="User Avatar">
                 <div class="profile-info">
                     <h2 id="userName">Your Profile</h2>
                     <div class="profile-stats">
@@ -53,29 +55,31 @@
                 </div>
             </div>
         </div>
-        <div class="leaderboard-controls">
+        <!-- <div class="leaderboard-controls">
             <button onclick="toggleLeaderboard()">Show Leaderboard</button>
             <select id="leaderboardSort" onchange="changeSortMethod(this.value)">
-                <!-- <option value="percentage">Achievement %</option> -->
+                <option value="percentage">Achievement %</option>
                 <option value="total">Total Achievements</option>
                 <option value="games">Total Games</option>
                 <option value="playtime">Playtime</option>
-                <!-- <option value="name">Name</option> -->
+                <option value="name">Name</option>
             </select>
-        </div>
+        </div> -->
 
         <div class="leaderboard-container">
             <h2>Leaderboard</h2>
-            <div id="leaderboard" class="leaderboard" style="display: none;">
+            <div id="leaderboard" class="leaderboard">
                 <div class="leaderboard-titles">
                     <div class="titles-names">
-                        <span class="leaderboard-rank-stat" title="Global Rank">Rank</span>
-                        <span title="User name">Name</span>
+                        <option class="leaderboard-rank-stat" title="Global Rank">Rank</option>
+                        <option value="name" onclick="changeSortMethod(this.value)" title="User name">Name</option>
                     </div>
                     <div class="titles-stats">
-                        <span title="Total Achievements">Achievements</span>
-                        <span title="Total Games">Games</span>
-                        <span title="Total Playtime">Hours Played</span>
+                        <option value="total" onclick="changeSortMethod(this.value)" title="Total Achievements">
+                            Achievements</option>
+                        <option value="games" onclick="changeSortMethod(this.value)" title="Total Games">Games</option>
+                        <option value="playtime" onclick="changeSortMethod(this.value)" title="Total Playtime">Hours
+                            Played</option>
                     </div>
 
                 </div>
@@ -143,6 +147,10 @@
         let currentGamesData = {
             inProgress: [],
             noProgress: []
+        };
+
+        onload = async () => {
+            await updateLeaderboard();
         };
 
         async function fetchUserProfile(steamId) {
@@ -393,6 +401,27 @@
 
         let currentAbortController = null;
 
+        function extractSteamId(input) {
+            // Remove any trailing slashes
+            input = input.trim().replace(/\/$/, '');
+
+            // Check if it's a full URL
+            if (input.includes('steamcommunity.com')) {
+                // Extract ID from URL
+                const urlMatch = input.match(/\/id\/([^\/]+)/);
+                if (urlMatch) {
+                    return urlMatch[1];
+                }
+                // Extract numeric ID from URL
+                const numericMatch = input.match(/\/profiles\/([^\/]+)/);
+                if (numericMatch) {
+                    return numericMatch[1];
+                }
+            }
+            // If no URL patterns match, return the input as is
+            return input;
+        }
+
         async function fetchGames() {
 
             if (currentAbortController) {
@@ -531,6 +560,7 @@
                     }
 
                     await Promise.all(batchPromises);
+                    await updateLeaderboard()
                 }
 
                 // Update profile stats and display games
@@ -631,7 +661,7 @@
                 (hiddenZero ? ` (${hiddenZero} hidden)` : '');
         }
 
-        let isLeaderboardVisible = false;
+        let isLeaderboardVisible = true;
 
         async function toggleLeaderboard() {
             const leaderboard = document.getElementById('leaderboard');

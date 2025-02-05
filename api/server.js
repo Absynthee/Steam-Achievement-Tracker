@@ -10,13 +10,15 @@ require("dotenv").config();
 const app = express();
 const cache = new NodeCache({ stdTTL: 6000 }); // 10 minutes cache
 
+const { cleanSteamId } = require("./utils/steamUtils");
+
 // Enable CORS
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "../public")));
 
 mongoose
   .connect(process.env.MONGODB_URI, {})
@@ -54,10 +56,11 @@ app.post("/api/users", async (req, res) => {
     const User = require("./models/User");
 
     // Standardize steamId to lowercase
-    const standardizedSteamId = req.body.steamId.toLowerCase();
+    // const standardizedSteamId = req.body.steamId.toLowerCase();
 
     const userData = {
-      steamId: standardizedSteamId, // Use standardized steamId
+      // steamId: standardizedSteamId, // Use standardized steamId
+      steamId: req.body.steamId, // Will be cleaned by the schema
       personaname: req.body.personaname,
       avatarUrl: req.body.avatarUrl,
       stats: req.body.stats,
@@ -67,7 +70,7 @@ app.post("/api/users", async (req, res) => {
     console.log("Processing user data:", userData);
 
     const user = await User.findOneAndUpdate(
-      { steamId: standardizedSteamId }, // Use standardized steamId for query
+      { steamId: userData.steamId }, // Use standardized steamId for query
       userData,
       {
         upsert: true,
@@ -93,44 +96,39 @@ app.get("/api/leaderboard", async (req, res) => {
     console.log("Fetching leaderboard...");
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 5;
-    const sortBy = req.query.sortBy || 'total'; // Get sort parameter
+    const sortBy = req.query.sortBy || "total"; // Get sort parameter
     const skip = (page - 1) * limit;
 
-    const User = require('./models/User');
-    
+    const User = require("./models/User");
+
     // Define sort options
     let sortOption = {};
-    switch(sortBy) {
-      case 'percentage':
-        sortOption = { 'stats.achievementPercentage': -1 };
+    switch (sortBy) {
+      case "percentage":
+        sortOption = { "stats.achievementPercentage": -1 };
         break;
-      case 'total':
-        sortOption = { 'stats.totalAchievements': -1 };
+      case "total":
+        sortOption = { "stats.totalAchievements": -1 };
         break;
-      case 'games':
-        sortOption = { 'stats.totalGames': -1 };
+      case "games":
+        sortOption = { "stats.totalGames": -1 };
         break;
-      case 'playtime':
-        sortOption = { 'stats.totalPlaytime': -1 };
+      case "playtime":
+        sortOption = { "stats.totalPlaytime": -1 };
         break;
-      case 'name':
-        sortOption = { 'personaname': 1 };
+      case "name":
+        sortOption = { personaname: 1 };
         break;
       default:
-        sortOption = { 'stats.totalAchievements': -1 };
+        sortOption = { "stats.totalAchievements": -1 };
     }
 
     // Add secondary sort to maintain consistent ordering
     sortOption.personaname = 1;
 
     const [users, total] = await Promise.all([
-        User.find()
-            .sort(sortOption)
-            .skip(skip)
-            .limit(limit)
-            .lean()
-            .exec(),
-        User.countDocuments()
+      User.find().sort(sortOption).skip(skip).limit(limit).lean().exec(),
+      User.countDocuments(),
     ]);
 
     console.log(`Found ${users.length} users on page ${page}`);
@@ -143,11 +141,51 @@ app.get("/api/leaderboard", async (req, res) => {
         pages: Math.ceil(total / limit),
         total,
         hasNext: page < Math.ceil(total / limit),
-        hasPrev: page > 1
+        hasPrev: page > 1,
       },
     });
   } catch (error) {
     console.error("Leaderboard error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+app.get("/api/cleanup-steam-ids", async (req, res) => {
+  try {
+    const User = require("./models/User");
+    const users = await User.find();
+    let updates = 0;
+    let duplicates = 0;
+
+    const processedIds = new Map();
+
+    for (const user of users) {
+      const originalId = user.steamId;
+      const cleanedId = cleanSteamId(originalId);
+
+      if (cleanedId !== originalId) {
+        if (processedIds.has(cleanedId)) {
+          await User.findByIdAndDelete(user._id);
+          duplicates++;
+          continue;
+        }
+
+        // Update the user with cleaned ID
+        await User.findByIdAndUpdate(user._id, { steamId: cleanedId });
+        updates++;
+      }
+
+      processedIds.set(cleanedId, user._id);
+    }
+
+    res.json({
+      success: true,
+      message: `Updated ${updates} users and removed ${duplicates} duplicates`,
+    });
+  } catch (error) {
     res.status(500).json({
       success: false,
       error: error.message,

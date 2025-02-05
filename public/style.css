@@ -289,7 +289,7 @@ main {
   width: 100px;
   height: 100px;
   border-radius: 50%;
-  border: 3px solid #66c0f4;
+  /* border: 3px solid #66c0f4; */
   align-content: center;
   text-align: center;
 }
@@ -389,6 +389,7 @@ a {
   border-radius: var(--border-radius);
   padding: 15px 20px;
   margin: 20px 0;
+  min-height: 553px;
 }
 
 .leaderboard-controls {
@@ -428,6 +429,10 @@ a {
   padding: 10px;
   background-color: var(--background-color);
   border-radius: var(--border-radius);
+}
+
+.leaderboard-entry:nth-child(even) {
+  background-color: var(--secondary-color);
 }
 
 .leaderboard-avatar {
@@ -485,6 +490,14 @@ a {
   padding: 10px;
   background-color: var(--accent-color);
   border-radius: var(--border-radius);
+  
+
+  option {
+    &:hover {
+      color: var(--primary-color-light);
+      cursor: pointer;
+    }
+  }
 }
 
 .titles-names {
@@ -497,7 +510,7 @@ a {
   justify-content: space-between;
   gap: 20px;
 
-  span {
+  option {
     width: 100%;
     max-width: 180px;
     text-align: right;
