@@ -501,6 +501,11 @@ a {
   }
 }
 
+.username-link {
+  width: max-content;
+  max-width: 175px;
+}
+
 .titles-names {
   gap: 62px;
   display: flex;
@@ -601,6 +606,10 @@ a {
   .profile-header {
     text-align: center;
     font-size: 0.9rem;
+  }
+
+  .leaderboard-rank {
+    margin-right: 10px;
   }
 
   .profile-avatar {
