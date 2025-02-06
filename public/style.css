@@ -40,6 +40,7 @@ header {
   border-radius: var(--border-radius);
   margin-inline: auto;
   margin-bottom: 20px;
+  transition: all 0.3s ease;
 }
 
 .header-title {
@@ -390,7 +391,7 @@ a {
   border-radius: var(--border-radius);
   padding: 15px 20px;
   margin: 20px 0;
-  min-height: 553px;
+  min-height: 500px;
 }
 
 .leaderboard-controls {
@@ -418,8 +419,8 @@ a {
 
 .leaderboard-grid {
   display: grid;
-  gap: 10px;
-  margin-top: 10px;
+  /* gap: 10px;
+  margin-top: 10px; */
 }
 
 .leaderboard-entry {
@@ -429,11 +430,16 @@ a {
   gap: 15px;
   padding: 10px;
   background-color: var(--background-color);
-  border-radius: var(--border-radius);
+  border-radius: 0;
+}
+
+.leaderboard-entry:nth-of-type(5) {
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
 }
 
 .leaderboard-entry:nth-child(even) {
   background-color: var(--secondary-color);
+  border-radius: 0;
 }
 
 .leaderboard-avatar {
@@ -487,11 +493,13 @@ a {
 
 .leaderboard-titles {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  /* gap: 48px; */
+  grid-template-columns: repeat(2, 1fr);
+  align-items: center;
+  min-width: fit-content;
+  gap: 15px;
   padding: 10px;
-  background-color: var(--accent-color);
-  border-radius: var(--border-radius);
+  background-color: var(--background-color);
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
 
   option {
     &:hover {
@@ -502,8 +510,7 @@ a {
 }
 
 .username-link {
-  width: max-content;
-  max-width: 175px;
+  width: 175px;
 }
 
 .titles-names {
@@ -563,11 +570,15 @@ a {
     flex-direction: column;
     width: calc(50% - 1rem);
   }
+
+  .leaderboard-titles {
+    gap: 150px;
+  }
 }
 
 @media screen and (max-width: 830px) {
   .leaderboard-titles {
-    gap: 80px;
+    gap: 150px;
   }
   #leaderboard {
     overflow: auto;
@@ -598,7 +609,7 @@ a {
   }
 
   .leaderboard-titles {
-    gap: 60px;
+    gap: 138px;
   }
 
   .titles-names {
@@ -640,7 +651,7 @@ a {
   }
 
   .leaderboard-titles {
-    gap: 12.5px;
+    gap: 15px;
   }
 
   .leaderboard-user {
@@ -654,6 +665,10 @@ a {
 
   .leaderboard-entry {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .username-link {
+    text-align: left;
   }
 }
 
