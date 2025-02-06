@@ -498,7 +498,7 @@ a {
   min-width: fit-content;
   gap: 15px;
   padding: 10px;
-  background-color: var(--background-color);
+  background-color: var(--accent-color);
   border-radius: var(--border-radius) var(--border-radius) 0 0;
 
   option {
