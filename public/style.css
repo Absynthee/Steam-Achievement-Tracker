@@ -215,13 +215,56 @@ main {
   height: 20px;
   border-radius: calc(var(--border-radius) * 2);
   overflow: hidden;
-  margin: 10px 0;
+  margin: 10px 0 0 0;
 }
 
 .achievement-progress {
   background-color: var(--primary-color);
   height: 100%;
   transition: width 0.3s ease;
+}
+
+.game-card-stats {
+  display: flex;
+  justify-content: space-between;
+}
+
+.game-card-stats-hours {
+  text-align: right;
+}
+
+.game-card-buttons {
+  display: flex;
+  width: 100%;
+  gap: 1rem;
+}
+
+.steam-button,
+.sh-button {
+  padding: 5px 10px;
+  background-color: var(--accent-color);
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  border-radius: var(--border-radius);
+  transition: background-color 0.2s;
+  font-size: 0.9rem;
+  width: 100%;
+  height: 36px;
+  background-image: url(./images/steam.svg);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-origin: content-box;
+
+  &:hover {
+    background-color: var(--primary-color-active);
+  }
+}
+
+.sh-button {
+  background-color: hsl(213, 35%, 16%);
+  background-image: url(./images/steam_hunters.svg);
 }
 
 .error {
@@ -364,6 +407,7 @@ main {
 a {
   color: inherit;
   text-decoration: none;
+  width: inherit;
 }
 
 .cancel-button {

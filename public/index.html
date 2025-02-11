@@ -576,7 +576,7 @@
 
                     await Promise.all(batchPromises);
                 }
-                
+
                 // Update profile stats and display games
                 updateProfileStats(games, gamesWithAchievements);
                 currentGamesData.inProgress = gamesWithAchievements.filter(game => game.achievements.completed > 0);
@@ -608,6 +608,8 @@
             cardLink.target = "_blank";
             cardLink.rel = "noopener noreferrer";
             cardLink.className = `game-card ${isCondensedView ? 'condensed' : ''}`;
+            let steamId = document.getElementById('steamId').value.trim();
+            cardLinkSH = `https://steamhunters.com/id/${steamId}/apps/${game.appid}/achievements`;
 
             // Store the game data for rebuilding the card
             cardLink.__gameData = game;
@@ -639,8 +641,18 @@
             <div class="achievement-bar">
                 <div class="achievement-progress" style="width: ${percentage}%"></div>
             </div>
-            <p>${completed}/${total} achievements (${percentage}%)</p>
-            <p>Playtime: ${playtimeHours} hours</p>
+            <div class="game-card-stats">
+                <p>${completed}/${total} achievements (${percentage}%)</p>
+                <p class="game-card-stats-hours">${playtimeHours} hours</p>
+            </div>
+            <div class="game-card-buttons">
+                <button class="steam-button">
+                </button>
+                <a href="${cardLinkSH}" target="_blank">
+                <button class="sh-button">
+                    </button>
+                    </a>
+            </div>
         `;
             }
 
